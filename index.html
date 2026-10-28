@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ruh Kristalleri</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Cinzel+Decorative:wght@700;900&family=Nunito:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="world.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="960" height="640"></canvas>
+    <!-- oyun içi HUD: 960x640 koordinatlarında çizilir, sahneye göre ölçeklenir -->
+    <div id="ui">
+      <div id="res" class="plate">
+        <div class="res gold" title="Altın"><i>💰</i><span id="gold">0</span></div>
+        <div class="res gem" title="Mahzendeki kristaller"><i>💎</i><span id="crystals">0</span></div>
+        <div class="res wave" title="Dalga"><i>⚔️</i><span id="wave">0/0</span></div>
+      </div>
+      <button id="nextWave" class="sign">Dalgayı Başlat ▶</button>
+      <div id="preview"></div>
+      <div id="toast" class="hidden"></div>
+      <div id="tut" class="hidden"></div>
+      <div id="tutArrow" class="hidden">▼</div>
+      <div id="ctrl">
+        <button id="speedBtn" class="medal" title="Hız (F)">x1</button>
+        <button id="pauseBtn" class="medal" title="Duraklat (Boşluk)">⏸</button>
+        <button id="muteBtn" class="medal" title="Ses">🔊</button>
+        <button id="menuBtn" class="medal" title="Menü">☰</button>
+      </div>
+      <div id="dock" class="plate">
+        <div id="spells"></div>
+        <div id="manaBox" title="Mana">
+          <div class="bar"><div id="manaFill"></div><span id="mana">0</span></div>
+        </div>
+      </div>
+      <div id="info" class="hidden"></div>
+    </div>
+    <!-- açılış ekranı: dünya haritası (960x640 düzleminde, sahneye göre ölçeklenir) -->
+    <div id="world">
+      <canvas id="worldBg" width="960" height="640"></canvas>
+      <div class="cloud c1"></div><div class="cloud c2"></div><div class="cloud c3"></div>
+      <svg id="trails" viewBox="0 0 960 640"></svg>
+      <div id="nodes"></div>
+      <div id="worldTitle" class="plate">
+        <span class="wt">Ruh Kristalleri</span>
+        <span class="ws">⭐ <b id="wStars">0</b>/<span id="wStarsMax">0</span></span>
+      </div>
+      <div id="unlockMsg"></div>
+      <div id="worldBar" class="plate">
+        <button class="wb" onclick="showPerks()"><span class="wi">🌳</span><span class="wl">Ruh Ağacı</span><em id="wFree"></em></button>
+        <button class="wb" onclick="showBestiary()"><span class="wi">📜</span><span class="wl">Düşmanlar</span></button>
+        <button class="wb" onclick="showAchievements()"><span class="wi">🏆</span><span class="wl">Başarımlar</span></button>
+        <button class="wb play" onclick="playNext()"><span class="wi">⚔️</span><span class="wl">Savaşa Git</span></button>
+        <button class="wb" onclick="openEndless()"><span class="wi">♾️</span><span class="wl">Sonsuz Mod</span></button>
+        <button class="wb" onclick="showHelp()"><span class="wi">❓</span><span class="wl">Nasıl Oynanır</span></button>
+        <button class="wb" onclick="showSettings()"><span class="wi">⚙️</span><span class="wl">Ayarlar</span></button>
+      </div>
+      <div id="levelCard"></div>
+    </div>
+    <div id="overlay"></div>
+  </div>
+</div>
+<script src="music.js"></script>
+<script src="game.js"></script>
+<script src="world.js"></script>
+<script src="tutorial.js"></script>
+</body>
+</html>

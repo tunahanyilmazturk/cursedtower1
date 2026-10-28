@@ -1,0 +1,251 @@
+/* =========================================================
+   Dünya haritası (açılış ekranı)
+   ========================================================= */
+#world { position: absolute; left: 0; top: 0; width: 960px; height: 640px; transform-origin: 0 0; display: none; z-index: 4; overflow: hidden; }
+#stage.in-world #world { display: block; }
+#stage.in-world #ui { display: none; }
+#worldBg { position: absolute; left: 0; top: 0; width: 960px; height: 640px; }
+
+.cloud {
+  position: absolute; width: 420px; height: 160px; pointer-events: none; opacity: .5;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,255,255,.35), transparent 60%),
+              radial-gradient(ellipse at 65% 45%, rgba(255,255,255,.3), transparent 55%);
+  animation: drift 80s linear infinite;
+}
+.cloud.c1 { top: 40px; animation-duration: 90s; }
+.cloud.c2 { top: 300px; animation-duration: 120s; animation-delay: -50s; opacity: .35; }
+.cloud.c3 { top: 470px; animation-duration: 100s; animation-delay: -80s; opacity: .3; }
+@keyframes drift { from { left: -440px; } to { left: 980px; } }
+
+#trails { position: absolute; inset: 0; width: 960px; height: 640px; pointer-events: none; }
+.tline { fill: none; stroke: rgba(30,18,8,.45); stroke-width: 9; stroke-linecap: round; }
+.tline.locked { stroke: rgba(30,18,8,.22); stroke-dasharray: 4 10; stroke-width: 5; }
+.tdots { fill: none; stroke: #f6e6bf; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 0.1 13; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+.tmask { fill: none; stroke: #fff; stroke-width: 20; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; transition: stroke-dashoffset 1.1s ease-in-out; }
+.tmask.pending { stroke-dashoffset: 1; }
+
+/* bölüm düğümleri */
+#nodes { position: absolute; inset: 0; pointer-events: none; }
+.node {
+  position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; padding: 0; border-radius: 50%; pointer-events: auto;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b852 45%, #8a5e1a);
+  border: 3px solid #fff0b8;
+  box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 3px var(--wood-3), 0 6px 12px rgba(0,0,0,.6);
+  transition: transform .4s cubic-bezier(.3,1.6,.5,1), filter .15s, opacity .4s;
+}
+.node:hover { transform: scale(1.1); filter: brightness(1.12); }
+.node .nm { font-family: Cinzel, serif; font-weight: 900; font-size: 14px; color: #3a2412; text-shadow: 0 1px 0 rgba(255,240,200,.7); }
+.node .nstars {
+  position: absolute; left: 50%; top: 41px; transform: translateX(-50%); white-space: nowrap;
+  font-size: 15px; letter-spacing: 1px; color: var(--gold-1); text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.8);
+}
+.node .nlabel {
+  position: absolute; left: 50%; top: 55px; transform: translateX(-50%); white-space: nowrap;
+  padding: 1px 7px; border-radius: 5px; font-family: Cinzel, serif; font-weight: 800; font-size: 10.5px; color: var(--parch-1);
+  background: var(--wood-grain), linear-gradient(180deg, var(--wood-1), var(--wood-2));
+  box-shadow: 0 0 0 1px var(--gold-2), 0 0 0 2px var(--wood-3), 0 3px 6px rgba(0,0,0,.5);
+}
+.node.locked { background: radial-gradient(circle at 35% 30%, #a8a39a, #6e6a62 55%, #3e3b36); border-color: #8e8a80; box-shadow: inset 0 0 0 3px #3e3b36, 0 0 0 3px var(--wood-3), 0 6px 12px rgba(0,0,0,.6); }
+.node.locked .nm { font-size: 16px; }
+.node.locked .nlabel { opacity: .7; color: #c9bba0; }
+.node.done { box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 3px var(--wood-3), 0 0 16px rgba(255,210,90,.6), 0 6px 12px rgba(0,0,0,.6); }
+.node.current { animation: pulse 1.6s ease-in-out infinite; }
+.node.current::before {
+  content: "⚔️"; position: absolute; left: 50%; top: -30px; transform: translateX(-50%); font-size: 19px;
+  animation: bob 1s ease-in-out infinite; filter: drop-shadow(0 2px 2px rgba(0,0,0,.7));
+}
+@keyframes pulse { 50% { box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 3px var(--wood-3), 0 0 26px 6px rgba(255,220,110,.85), 0 6px 12px rgba(0,0,0,.6); } }
+@keyframes bob { 50% { transform: translateX(-50%) translateY(-6px); } }
+.node.fresh { transform: scale(0); opacity: 0; }
+.node.shake { animation: shake .4s; }
+@keyframes shake { 20%, 60% { margin-left: -28px; } 40%, 80% { margin-left: -16px; } }
+
+/* başlık ve bildirim */
+#worldTitle {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 16px; padding: 6px 18px;
+}
+#worldTitle .wt {
+  font-family: "Cinzel Decorative", Cinzel, serif; font-weight: 900; font-size: 26px; white-space: nowrap;
+  background: linear-gradient(180deg, #fff6d0, var(--gold-1) 45%, #b8862a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 #1a0e05);
+}
+#worldTitle .ws { font-family: Cinzel, serif; font-weight: 900; color: var(--parch-1); font-size: 16px; text-shadow: 0 2px 0 #000; white-space: nowrap; }
+#worldTitle .ws b { color: var(--gold-1); }
+
+#unlockMsg {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%) translateY(-10px); opacity: 0; pointer-events: none;
+  padding: 7px 20px; border-radius: 8px; white-space: nowrap;
+  font-family: Cinzel, serif; font-weight: 900; font-size: 15px; color: var(--ink-dark);
+  background: linear-gradient(180deg, #fbe7a2, #e2b852 50%, #b4852c);
+  box-shadow: inset 0 0 0 2px #8a5e1a, 0 0 0 2px var(--wood-3), 0 6px 14px rgba(0,0,0,.6), 0 0 22px rgba(255,200,80,.5);
+  transition: opacity .3s, transform .3s;
+}
+#unlockMsg.show { opacity: 1; transform: translateX(-50%); }
+
+/* alt menü çubuğu */
+/* alt menü çubuğu: eşit boyutlu, aynı hizada madalyon düğmeler */
+#worldBar {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: stretch; padding: 5px 6px;
+  animation: barIn .6s cubic-bezier(.2,1.3,.4,1) both;
+}
+@keyframes barIn { from { transform: translateX(-50%) translateY(90px); opacity: 0; } }
+.wb {
+  position: relative; width: 100px; height: 72px; padding: 0; flex: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  border: none; border-radius: 8px; background: transparent; box-shadow: none;
+  color: var(--parch-1); font-family: Cinzel, serif; font-size: 12px; text-shadow: 0 1px 0 #000;
+  transition: background .2s;
+}
+/* düğmeler arası ince altın ayraç */
+.wb + .wb::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(201,162,74,.55), transparent);
+}
+.wb:hover:not(:disabled) { background: radial-gradient(ellipse at 50% 40%, rgba(255,220,150,.16), transparent 70%); filter: none; }
+.wb:active:not(:disabled) { transform: none; }
+.wb .wi {
+  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; font-size: 19px;
+  background: radial-gradient(circle at 35% 30%, #7a5230, var(--wood-2) 70%);
+  box-shadow: 0 0 0 2px var(--gold-2), 0 0 0 3px var(--wood-3), 0 3px 6px rgba(0,0,0,.6);
+  transition: transform .2s cubic-bezier(.3,1.6,.5,1), box-shadow .2s;
+}
+.wb:hover .wi { transform: translateY(-3px) scale(1.1); box-shadow: 0 0 0 2px var(--gold-1), 0 0 0 3px var(--wood-3), 0 0 16px rgba(255,210,90,.7), 0 6px 10px rgba(0,0,0,.6); }
+.wb:active .wi { transform: translateY(0) scale(.95); }
+.wb .wl { line-height: 1; white-space: nowrap; }
+.wb.play .wi {
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b852 45%, #8a5e1a);
+  animation: playGlow 1.8s ease-in-out infinite;
+}
+.wb.play .wl { color: var(--gold-1); font-weight: 900; }
+@keyframes playGlow { 50% { box-shadow: 0 0 0 2px #fff0b8, 0 0 0 3px var(--wood-3), 0 0 20px 4px rgba(255,210,90,.8); } }
+.wb em {
+  position: absolute; top: 4px; right: 22px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  font-style: normal; font-family: Nunito, sans-serif; font-size: 11px; line-height: 18px; color: #3a2412; text-shadow: none;
+  background: var(--gold-1); box-shadow: 0 0 0 2px var(--wood-3), 0 0 10px rgba(255,210,90,.8);
+  animation: badge 1.4s ease-in-out infinite;
+}
+@keyframes badge { 50% { transform: scale(1.15); } }
+.wb em:empty { display: none; }
+
+/* bölüm kartı */
+#levelCard { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8,5,3,.5); }
+#levelCard.show { display: flex; animation: fade .2s ease-out; }
+.lc {
+  position: relative; width: 430px; padding: 22px 26px 18px; text-align: center; color: var(--ink-dark);
+  background: radial-gradient(ellipse at 50% 35%, var(--parch-1), var(--parch-2) 90%);
+  border-radius: 10px;
+  box-shadow: inset 0 0 30px rgba(120,80,30,.4), 0 0 0 3px var(--gold-3), 0 0 0 7px var(--wood-2), 0 0 0 9px var(--gold-2), 0 20px 50px rgba(0,0,0,.7);
+  animation: rise .25s ease-out;
+}
+.lc-num {
+  position: absolute; top: -26px; left: 50%; transform: translateX(-50%); width: 52px; height: 52px; display: grid; place-items: center;
+  font-family: Cinzel, serif; font-weight: 900; font-size: 24px; color: #3a2412; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b852 45%, #8a5e1a);
+  box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 3px var(--wood-3), 0 4px 8px rgba(0,0,0,.6);
+}
+.lc h3 { margin: 18px 0 0; font-family: Cinzel, serif; font-weight: 900; font-size: 26px; color: #4a1d0e; }
+.lc-stars { font-size: 24px; letter-spacing: 3px; color: #c8901c; text-shadow: 0 1px 0 #fff3c4; }
+.lc p { margin: 8px 0 12px; font-size: 14px; line-height: 1.5; color: #4a3018; font-style: italic; }
+.lc-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lc-info span { padding: 3px 9px; border-radius: 12px; font-size: 12.5px; font-weight: 800; background: rgba(90,58,32,.15); box-shadow: inset 0 0 0 1px rgba(90,58,32,.3); }
+.lc-enemies { display: flex; justify-content: center; gap: 6px; margin: 12px 0 4px; font-size: 20px; }
+.lc-enemies span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: rgba(90,58,32,.15); box-shadow: inset 0 0 0 1px rgba(90,58,32,.35); }
+/* aşamalar: Kolay → Normal → Zor */
+.tiers { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 12px; }
+.tier {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; text-align: left;
+  background: rgba(90,58,32,.1); box-shadow: inset 4px 0 0 var(--tc), inset 0 0 0 1px rgba(90,58,32,.3);
+}
+.tier .tn { flex: 1; }
+.tier .tn b { display: block; font-family: Cinzel, serif; font-size: 15px; color: #4a1d0e; }
+.tier .tn small { color: #6b4a2a; font-size: 11.5px; }
+.tier .ts { font-size: 18px; letter-spacing: 1px; color: var(--tc); text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.tier .go { padding: 5px 12px; font-size: 13px; min-width: 76px; }
+.tier .tl { font-size: 11px; font-weight: 800; color: #7a5a3a; max-width: 120px; text-align: right; }
+.tier.locked { opacity: .6; filter: grayscale(.6); }
+
+/* düğüm altındaki aşama yıldızları */
+.node .nstars { display: flex; gap: 4px; font-size: 10px; letter-spacing: 0; }
+.node .nt { color: var(--tc); }
+.node .nt.off { opacity: .35; filter: grayscale(1); }
+.node.mastered::after {
+  content: "👑"; position: absolute; right: -10px; top: -12px; font-size: 18px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.7));
+}
+
+/* sonuç ekranında bölüm · aşama etiketi */
+.tier-tag {
+  display: inline-block; margin-bottom: 4px; padding: 2px 14px; border-radius: 12px;
+  font-family: Cinzel, serif; font-weight: 800; font-size: 13px; color: #fff8e0; text-shadow: 0 1px 0 #000;
+  background: var(--tc); box-shadow: 0 0 0 2px var(--wood-3);
+}
+.lc-btns { display: flex; gap: 8px; justify-content: center; }
+.lc-btns button { padding: 9px 18px; border-radius: 8px; font-family: Cinzel, serif; font-size: 16px; }
+.lc-btns .go, .tier .go {
+  color: var(--ink-dark); text-shadow: 0 1px 0 rgba(255,240,200,.6);
+  background: linear-gradient(180deg, #fbe7a2, #e2b852 50%, #b4852c); border: 2px solid #fff0b8;
+  box-shadow: inset 0 0 0 2px #8a5e1a, 0 0 0 2px var(--wood-3), 0 4px 10px rgba(0,0,0,.45);
+}
+.lc-btns .close { color: var(--parch-1); background: linear-gradient(180deg, var(--wood-1), var(--wood-2)); border: 2px solid var(--gold-3); }
+
+/* sonuç ekranı yıldızları */
+.rstars { margin: 8px 0 4px; font-size: 46px; letter-spacing: 8px; color: var(--gold-1); text-shadow: 0 3px 0 #1a0e05, 0 0 16px rgba(255,200,80,.6); }
+
+/* düşman ansiklopedisi */
+.beasts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 12px 0; text-align: left; }
+.beast {
+  padding: 10px 12px; border-radius: 8px; color: var(--ink-dark);
+  background: radial-gradient(ellipse at 50% 40%, var(--parch-1), var(--parch-2) 90%);
+  box-shadow: inset 0 0 14px rgba(120,80,30,.35), 0 0 0 2px var(--gold-3);
+}
+.beast.unseen { opacity: .55; }
+.beast .bi { float: left; font-size: 30px; margin-right: 8px; }
+.beast b { display: block; font-family: Cinzel, serif; font-size: 15px; color: #4a1d0e; }
+.beast small { display: block; color: #5a3c22; margin: 2px 0 6px; }
+.bstats { clear: both; display: flex; gap: 8px; font-size: 12px; font-weight: 800; color: #4a3018; }
+.lc-region { margin-top: 16px; font-family: Cinzel, serif; font-weight: 800; font-size: 12px; letter-spacing: 1px; color: #8a5a2a; }
+.lc-region + h3 { margin-top: 2px; }
+
+/* haritada süzülen ışık zerreleri */
+.mote {
+  position: absolute; width: 4px; height: 4px; border-radius: 50%; pointer-events: none;
+  background: #fff3b0; box-shadow: 0 0 8px 2px rgba(255,230,140,.7);
+  animation: mote 6s ease-in-out infinite;
+}
+@keyframes mote {
+  0% { opacity: 0; transform: translate(0, 0); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(24px, -70px); }
+}
+/* sıradaki bölümün etrafında yayılan halka */
+.node.current .nm::after {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+  border: 2px solid rgba(255,226,122,.9); animation: ripple 1.6s ease-out infinite;
+}
+@keyframes ripple { to { inset: -22px; opacity: 0; } }
+/* yeni açılan bölüm patlaması */
+.node.burst { animation: burst .9s ease-out; }
+@keyframes burst {
+  0% { box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 0 rgba(255,226,122,.9), 0 0 40px 10px rgba(255,226,122,.9); }
+  100% { box-shadow: inset 0 0 0 3px #8a5e1a, 0 0 0 36px rgba(255,226,122,0), 0 6px 12px rgba(0,0,0,.6); }
+}
+.node:hover .nlabel { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 0 1px var(--gold-1), 0 0 0 2px var(--wood-3), 0 0 10px rgba(255,210,90,.5); }
+.node .nlabel { transition: transform .2s, box-shadow .2s; }
+
+/* başarımlar */
+.achs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 12px 0; text-align: left; }
+.achc {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ink-dark);
+  background: radial-gradient(ellipse at 50% 40%, var(--parch-1), var(--parch-2) 90%);
+  box-shadow: inset 0 0 14px rgba(120,80,30,.35), 0 0 0 2px var(--gold-3);
+  opacity: .6; filter: grayscale(.7);
+}
+.achc.done { opacity: 1; filter: none; box-shadow: inset 0 0 14px rgba(120,80,30,.35), 0 0 0 2px var(--gold-1), 0 0 12px rgba(255,210,90,.45); }
+.achc .ai { font-size: 26px; }
+.achc div { flex: 1; }
+.achc b { display: block; font-family: Cinzel, serif; font-size: 13.5px; color: #4a1d0e; }
+.achc small { color: #5a3c22; font-size: 11.5px; }
+.achc em { font-style: normal; font-size: 11px; font-weight: 800; color: #8a5a1a; white-space: nowrap; }
+.achc.done em { color: #2f6b1e; }
