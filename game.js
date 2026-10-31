@@ -375,7 +375,26 @@ let G = null;
 const terrCanvas = document.createElement('canvas');
 terrCanvas.width = W; terrCanvas.height = H;
 // canvas çözünürlüğü / oyun koordinatı oranı (fitUI ayarlar)
+// Oyun alanı (960x640) pencereye en büyük hâliyle sığdırılır; artta kalan kenarlar
+// bulanık arazi görüntüsüyle doldurulur. fitUI ayarlar:
+//   VIEW: oyun biriminden CSS pikseline ölçek (sc), ortalama ofseti (ox, oy), canvas/CSS oranı (px)
+//   RES: oyun birimi başına canvas pikseli (sc * px)
 let RES = 1;
+// oyun alanının dışında kalan pencere payı (oyun birimi): sol, sağ, üst, alt
+let PAD = { l: 0, r: 0, t: 0, b: 0 };
+const VIEW = { sc: 1, ox: 0, oy: 0, px: 1, rx: 0, ry: 0 };
+// sağdaki kule paneli için ayrılan genişlik (CSS pikseli)
+const SIDE_W = 150;
+// arazinin küçük, bulanık kopyası: pencerenin tamamını arka plan olarak doldurur
+const bgCanvas = document.createElement('canvas');
+bgCanvas.width = 160; bgCanvas.height = 100;
+function makeBg() {
+  const c = bgCanvas.getContext('2d');
+  c.imageSmoothingEnabled = true;
+  c.drawImage(terrCanvas, 0, 0, bgCanvas.width, bgCanvas.height);
+  c.fillStyle = 'rgba(8,5,3,.45)';
+  c.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+}
 
 function newGame(li, tier = 0) {
   const L = levelDef(li), rng = mulberry32(L.seed);
@@ -505,8 +524,18 @@ const TERR_COLORS = ['#4f7a3a', '#35504a', '#77746c', '#4a3c38'];
 const looksLike = (x, y) => G.terr[y][x] < PATH ? G.terr[y][x] : G.base[y][x];
 
 function renderTerrain() {
+  PAD = { l: Math.max(0, VIEW.ox / VIEW.sc), r: Math.max(0, VIEW.rx / VIEW.sc), t: Math.max(0, VIEW.oy / VIEW.sc), b: Math.max(0, VIEW.ry / VIEW.sc) };
+  terrCanvas.width = Math.round((W + PAD.l + PAD.r) * RES);
+  terrCanvas.height = Math.round((H + PAD.t + PAD.b) * RES);
   const c = terrCanvas.getContext('2d');
-  c.setTransform(RES, 0, 0, RES, 0, 0);
+  c.setTransform(RES, 0, 0, RES, PAD.l * RES, PAD.t * RES);
+  // dış pay: ızgaranın kenar karolarının türü uzatılır (yol kenardan içeri uzanıyorsa dışarıda da devam eder)
+  const ox0 = Math.ceil(PAD.l / TILE) + 1, oy0 = Math.ceil(PAD.t / TILE) + 1;
+  const ox1 = Math.ceil(PAD.r / TILE) + 1, oy1 = Math.ceil(PAD.b / TILE) + 1;
+  for (let y = -oy0; y < ROWS + oy1; y++)
+    for (let x = -ox0; x < COLS + ox1; x++)
+      if (x < 0 || y < 0 || x >= COLS || y >= ROWS)
+        drawTile(c, x, y, looksLike(clamp(x, 0, COLS - 1), clamp(y, 0, ROWS - 1)));
   G.byType = [[], [], [], []];
   for (let y = 0; y < ROWS; y++)
     for (let x = 0; x < COLS; x++) {
@@ -525,6 +554,7 @@ function renderTerrain() {
   drawPlaza(c);
   for (let y = 0; y < ROWS; y++)
     for (let x = 0; x < COLS; x++) if (G.tree[y][x]) drawTree(c, x, y);
+  makeBg();
 }
 
 // komşu arazi türüyle sınırı düzensiz lekelerle yumuşatır
@@ -552,7 +582,8 @@ function drawPaths(c) {
     c.strokeStyle = col; c.lineWidth = w;
     for (const p of G.paths) {
       c.beginPath();
-      p.pts.forEach((q, i) => i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y));
+      const pts = PAD.l > 0 && p.pts[0].x < 0 ? [{ x: -PAD.l - 2, y: p.pts[0].y }, ...p.pts] : p.pts;
+      pts.forEach((q, i) => i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y));
       c.stroke();
     }
   }
@@ -594,18 +625,29 @@ function drawPlaza(c) {
   }
 }
 
-function drawTile(c, x, y) {
-  const r = mulberry32(x * 92837 + y * 1237 + G.L.seed * 7), px = x * TILE, py = y * TILE, t = looksLike(x, y);
-  const base = TERR_COLORS[t];
+function drawTile(c, x, y, tt) {
+  const r = mulberry32(x * 92837 + y * 1237 + G.L.seed * 7), px = x * TILE, py = y * TILE, t = tt === undefined ? looksLike(x, y) : tt;
+  const base = t === GRASS ? '#5f9c44' : TERR_COLORS[t];
   c.fillStyle = base;
   c.fillRect(px, py, TILE, TILE);
   if (t === GRASS) {
-    c.strokeStyle = '#6b9a4a'; c.lineWidth = 1.5;
-    for (let i = 0; i < 7; i++) {
-      const gx = px + r() * TILE, gy = py + r() * TILE;
-      c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx + r() * 4 - 2, gy - 5); c.stroke();
+    // canlı çimen: açık ve koyu lekeler, konturlu çimen demetleri
+    for (let i = 0; i < 4; i++) {
+      c.fillStyle = r() < 0.5 ? '#74b050' : '#4f8a3a';
+      c.globalAlpha = 0.4; circle2(c, px + r() * TILE, py + r() * TILE, 5 + r() * 6);
     }
-    if (r() < 0.3) { c.fillStyle = ['#e8d36a', '#d97ad0', '#f4f4f4'][Math.floor(r() * 3)]; circle2(c, px + r() * TILE, py + r() * TILE, 2); }
+    c.globalAlpha = 1;
+    c.strokeStyle = '#2d5520'; c.lineWidth = 1.6; c.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const gx = px + 4 + r() * (TILE - 8), gy = py + 6 + r() * (TILE - 10);
+      c.beginPath();
+      c.moveTo(gx - 2, gy); c.quadraticCurveTo(gx - 2, gy - 4, gx - 4, gy - 6);
+      c.moveTo(gx, gy); c.lineTo(gx, gy - 7);
+      c.moveTo(gx + 2, gy); c.quadraticCurveTo(gx + 2, gy - 4, gx + 4, gy - 6);
+      c.stroke();
+    }
+    c.lineCap = 'butt';
+    if (r() < 0.25) { c.fillStyle = ['#ffe66a', '#ff8fd6', '#ffffff'][Math.floor(r() * 3)]; circle2(c, px + r() * TILE, py + r() * TILE, 2.2); }
   } else if (t === SWAMP) {
     c.fillStyle = '#284440';
     ellipse(c, px + 10 + r() * 20, py + 10 + r() * 20, 9 + r() * 6, 5 + r() * 4);
@@ -666,10 +708,19 @@ function drawTree(c, x, y) {
     c.strokeStyle = '#3d6b40'; c.lineWidth = 2;
     for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(cx + i * 5, cy - 10); c.quadraticCurveTo(cx + i * 6, cy - 2, cx + i * 6.5, cy + 6); c.stroke(); }
   } else {
-    c.fillStyle = '#4a2f1c'; c.fillRect(cx - 3, cy, 6, 12);
-    const g = ['#1f4a26', '#28592d', '#336b35'];
-    for (let i = 0; i < 3; i++) { c.fillStyle = g[i]; circle2(c, cx + (i - 1) * 6, cy - 4 - i * 3, 11 - i * 2); }
-    c.fillStyle = 'rgba(160,220,110,.35)'; circle2(c, cx + 3, cy - 14, 4);
+    // yuvarlak, konturlu ağaç: gövde, üç katmanlı taç ve parlak yüzey
+    c.fillStyle = '#5a3a20'; c.fillRect(cx - 3, cy, 6, 12);
+    c.strokeStyle = '#2a1a0c'; c.lineWidth = 1.5; c.strokeRect(cx - 3, cy, 6, 12);
+    const crown = ['#2e7a34', '#3d8e3e', '#4ea04a'];
+    const ox = [-6, 6, 0], oy = [-4, -4, -11], rr = [9, 9, 10];
+    for (let i = 0; i < 3; i++) {
+      c.fillStyle = crown[i];
+      circle2(c, cx + ox[i], cy + oy[i], rr[i]);
+      c.strokeStyle = '#1c4220'; c.lineWidth = 2;
+      c.beginPath(); c.arc(cx + ox[i], cy + oy[i], rr[i], 0, Math.PI * 2); c.stroke();
+    }
+    c.fillStyle = 'rgba(190,240,130,.55)'; circle2(c, cx + 3, cy - 14, 3.5);
+    c.fillStyle = 'rgba(190,240,130,.35)'; circle2(c, cx - 5, cy - 6, 2.5);
   }
 }
 
@@ -802,6 +853,16 @@ function updateEnemies(dt) {
 }
 
 // seviye 3 = seçilen uzmanlık
+// Seçili boş karo için kurulum durumu: { ok, range } ya da null (yol, mahzen, kule üstü)
+function placementAt(tx, ty) {
+  if (G.terr[ty][tx] >= PATH || towerAt(tx, ty)) return null;
+  if (G.tree[ty][tx]) return { ok: false, range: 0 };
+  const key = G.buildType || Object.keys(TOWERS).find(k => TOWERS[k].terrain === G.terr[ty][tx]);
+  if (!key || TOWERS[key].terrain !== G.terr[ty][tx]) return { ok: false, range: 0 };
+  const cost = priceOf(key, TOWERS[key].levels[0].cost);
+  return { ok: G.gold >= cost, range: modStats(key, TOWERS[key].levels[0]).range };
+}
+
 function towerStats(t) {
   return modStats(t.type, baseStats(t.type, t.level, t.branch));
 }
@@ -1312,7 +1373,7 @@ function callWave() {
 // ---------- girdi ----------
 function evPos(ev) {
   const r = cv.getBoundingClientRect();
-  return { x: (ev.clientX - r.left) * W / r.width, y: (ev.clientY - r.top) * H / r.height };
+  return { x: (ev.clientX - r.left - VIEW.ox) / VIEW.sc, y: (ev.clientY - r.top - VIEW.oy) / VIEW.sc };
 }
 cv.addEventListener('mousemove', ev => { if (G) G.hover = evPos(ev); });
 cv.addEventListener('mouseleave', () => { if (G) G.hover = null; });
@@ -1320,6 +1381,15 @@ cv.addEventListener('contextmenu', ev => { ev.preventDefault(); if (G) { G.spell
 cv.addEventListener('click', ev => {
   if (!G || G.demo || G.over) return;
   const p = evPos(ev);
+  if (G.buildType && G.spell === null) {
+    const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE);
+    if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return;
+    const n = G.towers.length;
+    build(G.buildType, tx, ty);
+    if (G.towers.length > n) G.buildType = null;
+    else sfx('bad');
+    return;
+  }
   if (G.spell !== null) {
     if (castSpell(G.spell, p.x, p.y) && !ev.shiftKey) G.spell = null;
     return;
@@ -1470,6 +1540,44 @@ function panelHTML() {
 }
 
 // ---------- HUD ----------
+// sağdaki kule paneli: seçmek için tıkla, sonra karoya tıkla
+let lastSide = '';
+function pickTower(k) {
+  if (!G || G.demo || G.over) return;
+  G.buildType = G.buildType === k ? null : k;
+  G.sel = null; G.spell = null;
+  lastSide = '';
+}
+function renderSide() {
+  const L = G.L, cards = Object.keys(TOWERS).map(k => {
+    const T = TOWERS[k], avail = T.terrain !== ASH || (L.terrains || 3) > 3;
+    const cost = priceOf(k, T.levels[0].cost), sel = G.buildType === k, poor = G.gold < cost;
+    return { k, T, avail, cost, sel, poor };
+  });
+  const sig = cards.map(c => [c.k, c.avail, c.sel, c.poor].join(':')).join('|');
+  if (sig === lastSide) return;
+  lastSide = sig;
+  $('sideCards').innerHTML = cards.map(c => `<div class="scard ${c.sel ? 'sel' : ''} ${c.poor ? 'poor' : ''} ${c.avail ? '' : 'na'}"
+      onclick="pickTower('${c.k}')" title="${c.T.desc}">
+      <span class="si">${c.T.icon}</span>
+      <span class="sinfo"><b>${c.T.name}</b><small>${c.avail ? c.T.desc.split('.')[0] : 'Bu bölgede yok'}</small></span>
+      <span class="sp">${c.cost}💰</span></div>`).join('');
+}
+// yeni görülen düşman: sol tarafta kart; tıklanınca özellikleri açılır
+function showEnemyCard(type) {
+  const e = ENEMIES[type], inf = ENEMY_INFO[type];
+  $('enemyCard').innerHTML = `<button class="ec-x" onclick="hideEnemyCard()">✕</button>
+    <div class="ec-head"><span class="ec-ico">${inf.icon}</span><div><small>Düşman</small><b>${e.name}</b></div></div>
+    <div class="ec-stats">
+      <span>❤ Can <b>${e.hp}</b></span><span>👟 Hız <b>${e.speed}</b></span>
+      <span>🛡 Zırh <b>%${Math.round(e.armor * 100)}</b></span><span>✨ Büyü dir. <b>%${Math.round(e.mres * 100)}</b></span>
+      <span>💰 Altın <b>${e.gold}</b></span><span>🔮 Mana <b>${e.mana}</b></span>
+    </div>
+    <p>${inf.tip}</p>`;
+  $('enemyCard').classList.remove('hidden');
+}
+function hideEnemyCard() { $('enemyCard').classList.add('hidden'); }
+
 function updateHUD() {
   if (!G) return;
   $('gold').textContent = G.gold;
@@ -1477,6 +1585,7 @@ function updateHUD() {
   $('manaFill').style.width = (G.mana / MANA_MAX * 100) + '%';
   $('crystals').textContent = G.crystals;
   $('wave').textContent = G.L.endless ? `${G.wave} / ∞` : `${G.wave}/${G.waves.length}`;
+  $('wprogFill').style.width = (G.L.endless ? 100 : (G.wave / G.waves.length) * 100) + '%';
   $('speedBtn').textContent = 'x' + G.speed;
   const nw = $('nextWave');
   if (G.wave === 0) { nw.textContent = 'Dalgayı Başlat ▶'; nw.disabled = G.demo; }
@@ -1503,19 +1612,26 @@ function updateHUD() {
     if (tq && tq.ach) {
       const a = ACHS.find(x => x.id === tq.ach);
       $('toast').innerHTML = `<span class="ti">${a.icon}</span><div><small>🏆 Başarım · +1⭐</small><b>${a.name}</b><p>${a.desc}</p></div>`;
-    } else if (tk) $('toast').innerHTML = `<span class="ti">${ENEMY_INFO[tk].icon}</span><div><small>Yeni düşman</small><b>${ENEMIES[tk].name}</b><p>${ENEMY_INFO[tk].tip}</p></div>`;
+    } else if (tk) $('toast').innerHTML = `<span class="ti">${ENEMY_INFO[tk].icon}</span><div><small>Yeni düşman · tıkla</small><b>${ENEMIES[tk].name}</b><p>${ENEMY_INFO[tk].tip}</p></div>`;
+    $('toast').onclick = tk && tk.indexOf('a:') !== 0 ? () => showEnemyCard(tk) : null;
     $('toast').classList.toggle('hidden', !tk);
     lastToast = tk;
   }
+  renderSide();
   const html = panelHTML();
   if (html !== lastPanel) { $('info').innerHTML = html; $('info').classList.toggle('hidden', !html); lastPanel = html; }
 }
 
 // ---------- çizim ----------
 function render() {
-  ctx.setTransform(RES, 0, 0, RES, 0, 0);
-  if (G && G.shake > 0) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
-  ctx.drawImage(terrCanvas, 0, 0, W, H);
+  // 1) tüm pencereyi bulanık arazi ile doldur
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(bgCanvas, 0, 0, cv.width, cv.height);
+  if (!G) return;
+  // 2) oyun alanını ortalanmış, ölçeklenmiş olarak çiz
+  ctx.setTransform(RES, 0, 0, RES, VIEW.ox * VIEW.px, VIEW.oy * VIEW.px);
+  if (G.shake > 0) ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+  ctx.drawImage(terrCanvas, -PAD.l, -PAD.t, W + PAD.l + PAD.r, H + PAD.t + PAD.b);
   if (!G) return;
   drawVault();
   for (const d of G.drops) drawGem(d.x, d.y - 4 + Math.sin(G.time * 5) * 2, 7, d.t < 3 && Math.floor(d.t * 6) % 2);
@@ -1584,7 +1700,7 @@ function render() {
   drawPillars();
   drawSouls();
   drawFog();
-  ctx.drawImage(vignette, 0, 0);
+  // kenar karartması kaldırıldı: oyun alanının kenarında çerçeve gibi görünüyordu
   ctx.textAlign = 'center';
   for (const t of G.texts) {
     // yazılar büyük doğar, hızla normal boyuta oturur
@@ -1614,8 +1730,18 @@ function render() {
         ctx.strokeRect(Math.floor(h.x / TILE) * TILE + 1, Math.floor(h.y / TILE) * TILE + 1, TILE - 2, TILE - 2);
       }
     } else {
-      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5;
-      ctx.strokeRect(Math.floor(h.x / TILE) * TILE + 1, Math.floor(h.y / TILE) * TILE + 1, TILE - 2, TILE - 2);
+      const tx = Math.floor(h.x / TILE), ty = Math.floor(h.y / TILE);
+      if (tx >= 0 && ty >= 0 && tx < COLS && ty < ROWS) {
+        const pv = placementAt(tx, ty);
+        if (pv) {
+          ctx.fillStyle = pv.ok ? 'rgba(120,230,110,.22)' : 'rgba(230,70,60,.22)';
+          ctx.fillRect(tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2);
+          if (pv.ok) rangeCircle(tx * TILE + TILE / 2, ty * TILE + TILE / 2, pv.range);
+        }
+        ctx.strokeStyle = pv ? (pv.ok ? 'rgba(170,255,150,.8)' : 'rgba(255,140,120,.8)') : 'rgba(255,255,255,.35)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2);
+      }
     }
   }
   if (G.banner) {
@@ -2160,17 +2286,22 @@ const overlay = $('overlay');
 // Canvas'lar da ekrandaki gerçek boyutta çizilir ki büyük ekranda bulanık görünmesin.
 let worldRepaint = 0;
 function fitUI() {
-  const w = $('stage').clientWidth, s = `scale(${w / W})`;
-  $('ui').style.transform = s;
-  $('world').style.transform = s;
+  const st = $('stage'), cw = st.clientWidth, ch = st.clientHeight;
+  // en büyük 3:2 alan; kalan kenarlar boş bırakılmaz, render() bulanık arazi ile doldurur
+  // oyun alanı, sağdaki kule paneli dışında kalan alanın ortasına yerleşir
+  const av = cw - SIDE_W, sc = Math.min(av / W, ch / H), ox = (av - W * sc) / 2, oy = (ch - H * sc) / 2;
+  const px = clamp(window.devicePixelRatio || 1, 1, 2);
+  Object.assign(VIEW, { sc, ox, oy, px, rx: cw - ox - W * sc, ry: ch - oy - H * sc });
+  // canvas pencerenin tamamı kadar; arazi ise oyun alanının gerçek çözünürlüğünde
+  cv.width = Math.round(cw * px);
+  cv.height = Math.round(ch * px);
+  RES = sc * px;
+  const tr = `translate(${ox}px, ${oy}px) scale(${sc})`;
+  $('ui').style.transform = tr;
+  $('world').style.transform = tr;
   // menü panelleri de sahneyle birlikte büyür/küçülür
-  overlay.style.setProperty('--ui', clamp(w / W, 0.7, 1.8).toFixed(3));
-  const res = clamp(Math.ceil(w * (window.devicePixelRatio || 1) / W * 4) / 4, 1, 3);
-  if (res === RES) return;
-  RES = res;
-  cv.width = terrCanvas.width = W * RES;
-  cv.height = terrCanvas.height = H * RES;
-  if (G) renderTerrain();
+  overlay.style.setProperty('--ui', clamp(sc, 0.7, 2).toFixed(3));
+  if (G) renderTerrain(); else makeBg();
   // dünya haritasını çizmek pahalı; boyutlandırma bitince bir kez yeniden çiz
   clearTimeout(worldRepaint);
   if (typeof paintWorld === 'function') worldRepaint = setTimeout(paintWorld, 200);
@@ -2258,39 +2389,62 @@ function showEndlessResult() {
 }
 
 // ---------- Ruh Ağacı ekranı ----------
+// Dallar üç bölgede toplanır; her dal yatay bir sıradır ve güçler soldan sağa açılır.
+const TREE_BANDS = [
+  { name: 'Doğa', icon: '🌿', ids: ['t', 's'] },
+  { name: 'Ateş & Kristal', icon: '🔥', ids: ['c', 'f'] },
+  { name: 'Sihir & Servet', icon: '✨', ids: ['m', 'g'] },
+];
 let treeSel = 't1';
 function showPerks() {
+  showOverlay(treeContent());
+}
+// Panel açıkken yalnızca içerik yenilenir; böylece her tıklamada panel baştan açılmaz
+function refreshPerks() {
+  const p = $('rtPanel');
+  if (!p || !overlayOpen()) return showPerks();
+  p.outerHTML = treeContent();
+}
+function treeContent() {
   const free = starsTotal() - starsSpent();
-  const cols = TREE.map(b => `<div class="tcol" style="--bc:${b.color}">
-      <div class="thead"><i>${b.icon}</i><b>${b.name}</b></div>
-      ${b.nodes.map(n => {
+  const branchRow = b => `<div class="rt-row" style="--bc:${b.color}">
+      <div class="rt-bname"><i>${b.icon}</i><span>${b.name}</span></div>
+      <div class="rt-nodes">${b.nodes.map(n => {
         const r = sk(n.id), open = nodeOpen(n);
-        const cls = [r >= n.max ? 'max' : r ? 'some' : '', open ? '' : 'locked', treeSel === n.id ? 'sel' : '',
-          open && r < n.max && free >= n.cost ? 'can' : ''].join(' ');
-        return `<div class="tcell"><button class="tnode ${cls}" onclick="selectNode('${n.id}')" title="${n.name}">
-            <span class="ti">${open ? n.icon : '🔒'}</span><span class="tr">${r}/${n.max}</span></button>
-            <div class="tname">${n.name}</div></div>`;
-      }).join('')}</div>`).join('');
+        const cls = [r >= n.max ? 'max' : r ? 'some' : '', open ? '' : 'locked',
+          treeSel === n.id ? 'sel' : '', open && r < n.max && free >= n.cost ? 'can' : ''].join(' ');
+        return `<button class="rt-nd ${cls}" onclick="selectNode('${n.id}')" title="${n.name}">
+            <span class="ti">${open ? n.icon : '🔒'}</span><span class="tr">${r}/${n.max}</span></button>`;
+      }).join('')}</div></div>`;
+  const bands = TREE_BANDS.map(bd => `<div class="rt-band">
+      <div class="rt-port"><span>${bd.icon}</span><b>${bd.name}</b></div>
+      <div class="rt-rows">${bd.ids.map(id => branchRow(TREE.find(b => b.id === id))).join('')}</div></div>`).join('');
 
   const n = TREE_NODES.find(x => x.id === treeSel), r = sk(n.id), open = nodeOpen(n);
   const prev = n.k ? n.branch.nodes[n.k - 1] : null;
-  const action = r >= n.max ? '<span class="tmax">✦ En üst kademe ✦</span>'
-    : !open ? `<span class="tlock">🔒 Önce üstteki "${prev.name}" gücünü al</span>`
-    : `<button onclick="buyNode('${n.id}')" ${free < n.cost ? 'disabled' : ''}>Yükselt (${n.cost}⭐)</button>`;
-  const det = `<div class="tdet" style="--bc:${n.branch.color}">
-      <span class="ti">${n.icon}</span>
-      <div class="tinfo"><b>${n.name}</b> <small>${n.branch.name} · Kademe ${r}/${n.max}</small>
-        ${r ? `<div class="now">Şu an: ${n.fx(r)}</div>` : ''}
-        ${r < n.max ? `<div class="next">${r ? 'Sonraki' : 'Etkisi'}: ${n.fx(r + 1)}</div>` : ''}</div>
-      <div class="tact">${action}</div></div>`;
+  const canUp = open && r < n.max && free >= n.cost;
+  // geri alınabilmesi için bu dalda sonraki güçlerden hiçbiri alınmamış olmalı
+  const canDown = r > 0 && !n.branch.nodes.slice(n.k + 1).some(x => sk(x.id) > 0);
+  const lockMsg = !open ? `<div class="rt-lock">🔒 Önce "${prev.name}" gücünü al</div>` : '';
+  const det = `<div class="rt-det" style="--bc:${n.branch.color}">
+      <div class="rt-dh"><span class="rt-di">${n.icon}</span>
+        <div><small>${n.branch.name}</small><b>${n.name}</b></div></div>
+      <div class="rt-rank">Rütbe <b>${r}</b> / ${n.max}</div>
+      <div class="rt-fx">${r ? `Şu an: ${n.fx(r)}` : 'Henüz alınmadı.'}</div>
+      ${r < n.max ? `<div class="rt-next">Sonraki: ${n.fx(r + 1)}</div>` : '<div class="rt-max">✦ En üst rütbe ✦</div>'}
+      ${lockMsg}
+      <div class="rt-btns">
+        <button class="rt-up" onclick="buyNode('${n.id}')" ${canUp ? '' : 'disabled'}>YÜKSELT · ${n.cost}⭐</button>
+        <button class="rt-down" onclick="degradeNode('${n.id}')" ${canDown ? '' : 'disabled'}>GERİ AL · +${n.cost}⭐</button>
+      </div></div>`;
 
-  showOverlay(`<div class="panel tree-panel"><h2>Ruh Ağacı</h2>
-    <div class="tree-top"><span>⭐ Boş yıldız: <b>${free}</b> <small>(toplam ${starsTotal()})</small></span>
-      <button class="treset" onclick="resetTree()" ${starsSpent() ? '' : 'disabled'}>↺ Ağacı Sıfırla</button></div>
-    ${det}<div class="tree">${cols}</div>
-    <button onclick="showMenu()">Geri</button></div>`);
+  return `<div class="panel rt-panel" id="rtPanel">
+    <div class="rt-top"><button class="rt-back" onclick="showMenu()">← Geri</button><h2>Ruh Ağacı</h2>
+      <span class="rt-stars">⭐ <b>${free}</b> <small>boş · ${starsTotal()} toplam</small></span>
+      <button class="treset" onclick="resetTree()" ${starsSpent() ? '' : 'disabled'}>↺ Sıfırla</button></div>
+    <div class="rt-body"><div class="rt-bands">${bands}</div>${det}</div>`;
 }
-function selectNode(id) { treeSel = id; showPerks(); }
+function selectNode(id) { treeSel = id; refreshPerks(); }
 function buyNode(id) {
   const n = TREE_NODES.find(x => x.id === id);
   if (!nodeOpen(n) || sk(id) >= n.max || starsTotal() - starsSpent() < n.cost) { sfx('bad'); return; }
@@ -2298,10 +2452,19 @@ function buyNode(id) {
   if (TREE_NODES.reduce((a, n) => a + sk(n.id), 0) >= 10) ach('tree10');
   persist();
   sfx('build');
-  showPerks();
+  refreshPerks();
+}
+// bir kademe geri alır ve yıldızını iade eder; sonraki güçler alınmışsa engellenir
+function degradeNode(id) {
+  const n = TREE_NODES.find(x => x.id === id), r = sk(id);
+  if (r <= 0 || n.branch.nodes.slice(n.k + 1).some(x => sk(x.id) > 0)) { sfx('bad'); return; }
+  if (r === 1) delete save.tree[id]; else save.tree[id] = r - 1;
+  persist();
+  sfx('coin');
+  refreshPerks();
 }
 // tüm yıldızları geri verir; farklı bir yapı denemek ücretsiz
-function resetTree() { save.tree = {}; persist(); sfx('coin'); showPerks(); }
+function resetTree() { save.tree = {}; persist(); sfx('coin'); refreshPerks(); }
 
 function showHelp() {
   showOverlay(`<div class="panel help"><h2 style="text-align:center">Nasıl Oynanır</h2><ul>

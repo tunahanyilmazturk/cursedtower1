@@ -94,12 +94,17 @@ const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
 const rgb = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
 
 function paintWorld() {
+  // oyun alanının dışında kalan pencere kenarları da deniz/arazi ile doldurulur
   const cvs = $('worldBg'), CS = 4;
-  cvs.width = W * RES; cvs.height = H * RES;
+  const exL = Math.max(0, Math.ceil(VIEW.ox / VIEW.sc)), exR = Math.max(0, Math.ceil(VIEW.rx / VIEW.sc));
+  const ex = exL, ey = Math.max(0, Math.ceil(VIEW.oy / VIEW.sc)), eyB = Math.max(0, Math.ceil(VIEW.ry / VIEW.sc));
+  cvs.width = Math.round((W + exL + exR) * RES); cvs.height = Math.round((H + ey + eyB) * RES);
+  cvs.style.width = (W + exL + exR) + 'px'; cvs.style.height = (H + ey + eyB) + 'px';
+  cvs.style.left = -exL + 'px'; cvs.style.top = -ey + 'px';
   const c = cvs.getContext('2d');
-  c.setTransform(RES, 0, 0, RES, 0, 0);
-  for (let y = 0; y < H; y += CS)
-    for (let x = 0; x < W; x += CS) {
+  c.setTransform(RES, 0, 0, RES, exL * RES, ey * RES);
+  for (let y = -ey; y < H + eyB; y += CS)
+    for (let x = -exL; x < W + exR; x += CS) {
       const f = landF(x, y), v = nFine(x, y);
       let col;
       if (f < -14) col = mix([44, 98, 108], [14, 34, 44], clamp(-f / 170, 0, 1)).map(q => q + (v - 0.5) * 8);
@@ -117,14 +122,14 @@ function paintWorld() {
   // dalgalar
   c.strokeStyle = 'rgba(220,240,240,.18)'; c.lineWidth = 1.5;
   for (let i = 0; i < 160; i++) {
-    const x = r() * W, y = r() * H;
+    const x = -exL + r() * (W + exL + exR), y = -ey + r() * (H + ey + eyB);
     if (landF(x, y) > -20) continue;
     c.beginPath(); c.arc(x, y, 6, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
   }
   // biyom süslemeleri (y'ye göre sıralı çizilir)
   const decos = [];
   for (let i = 0; i < 2600; i++) {
-    const x = r() * W, y = r() * H;
+    const x = -exL + r() * (W + exL + exR), y = -ey + r() * (H + ey + eyB);
     if (landF(x, y) < 16) continue;
     if (WORLD_NODES.some(n => Math.hypot(x - n.x, y - n.y) < 40) || REGIONS.some(g => Math.hypot(x - g.x, y - g.y) < 30)
       || Math.hypot(x - HOME.x, y - HOME.y) < 40) continue;
@@ -151,8 +156,9 @@ function paintWorld() {
   label('Cadının Kulübesi', HOME.x, HOME.y + 24, 12);
 
   drawCompass(c, 895, 500);
-  c.drawImage(vignette, 0, 0);
+  // kenar karartması kaldırıldı: harita pencerenin tamamını doldurur
 }
+
 
 function drawDeco(c, d) {
   const { x, y, s, v } = d;
@@ -287,27 +293,37 @@ function openLevel(i) {
     sfx('bad');
     return;
   }
-  const L = LEVELS[i], st = save.stars[i];
+  const L = LEVELS[i], st = save.stars[i], R = REGIONS[L.r], total = levelStars(i);
+  // üç zorluk aşaması yan yana: her biri kendi renginde, kilidi ve yıldızları
   const tiers = TIERS.map((T, t) => {
     const open = tierOpen(i, t), n = st[t];
-    return `<div class="tier ${open ? '' : 'locked'}" style="--tc:${T.color}">
-        <div class="tn"><b>${T.name}</b><small>${T.desc}</small></div>
-        <div class="ts">${'★'.repeat(n)}${'☆'.repeat(3 - n)}</div>
-        ${open ? `<button class="go" onclick="startLevel(${i}, ${t})">${n ? 'Tekrar' : '⚔ Oyna'}</button>`
-          : `<span class="tl">🔒 ${TIERS[t - 1].name} aşamasında 3★ al</span>`}
+    return `<div class="ltier ${open ? '' : 'locked'} ${n === 3 ? 'perfect' : ''}" style="--tc:${T.color}">
+        <div class="lt-name">${T.name}</div>
+        <div class="lt-desc">${T.desc}</div>
+        <div class="lt-stars">${[0, 1, 2].map(k => `<span class="${k < n ? 'on' : ''}">★</span>`).join('')}</div>
+        ${open ? `<button class="go" onclick="startLevel(${i}, ${t})">${n ? '↻ Tekrar' : '⚔ Oyna'}</button>`
+          : `<div class="lt-lock">🔒 ${TIERS[t - 1].name} aşamasında 3★ al</div>`}
       </div>`;
   }).join('');
+  // düşmanlar: görülmemiş olanlar soluk ve "???" olarak gösterilir
   const types = [...new Set(makeWaves(i).flatMap(w => w.groups.map(g => g.type)))];
-  $('levelCard').innerHTML = `<div class="lc">
-      <div class="lc-num">${L.r + 1}-${i % 3 + 1}</div>
-      <div class="lc-region">${REGIONS[L.r].mark} ${REGIONS[L.r].name}</div>
-      <h3>${L.name}</h3>
-      <div class="lc-stars">★ ${levelStars(i)} / 9</div>
-      <p>${LEVEL_LORE[i]}</p>
-      <div class="lc-info"><span>🌊 ${L.waves} dalga</span><span>🛤️ ${L.paths.length} yol</span><span>💎 ${L.crystals + 2 * sk('g3')} kristal</span>${L.terrains === 4 ? '<span>🔥 Kül arazisi</span>' : ''}</div>
-      <div class="lc-enemies">${types.map(t => `<span title="${ENEMIES[t].name}">${save.seen[t] ? ENEMY_INFO[t].icon : '❔'}</span>`).join('')}</div>
-      <div class="tiers">${tiers}</div>
-      <div class="lc-btns"><button class="close" onclick="closeLevelCard()">Kapat</button></div>
+  const foes = types.map(t => {
+    const seen = save.seen[t];
+    return `<div class="foe ${seen ? '' : 'unseen'}" title="${seen ? ENEMIES[t].name : 'Henüz görülmedi'}">
+        <span>${seen ? ENEMY_INFO[t].icon : '❔'}</span><small>${seen ? ENEMIES[t].name : '???'}</small></div>`;
+  }).join('');
+  $('levelCard').innerHTML = `<div class="lc lv">
+      <div class="lv-badge">${L.r + 1}-${i % 3 + 1}</div>
+      <button class="lv-x" onclick="closeLevelCard()" aria-label="Kapat">✕</button>
+      <div class="lv-region">${R.mark} ${R.name}</div>
+      <h3 class="lv-title">${L.name}</h3>
+      <p class="lv-lore">${LEVEL_LORE[i]}</p>
+      <div class="lv-progress"><div class="lv-bar"><i style="width:${total / 9 * 100}%"></i></div><span>★ ${total} / 9</span></div>
+      <div class="lv-info"><span>🌊 ${L.waves} dalga</span><span>🛤️ ${L.paths.length} yol</span><span>💎 ${L.crystals + 2 * sk('g3')} kristal</span>${L.terrains === 4 ? '<span>🔥 Kül arazisi</span>' : ''}</div>
+      <div class="lv-sec">Düşmanlar</div>
+      <div class="lv-foes">${foes}</div>
+      <div class="lv-sec">Zorluk</div>
+      <div class="lv-tiers">${tiers}</div>
     </div>`;
   $('levelCard').classList.add('show');
 }

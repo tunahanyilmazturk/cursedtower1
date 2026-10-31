@@ -1,7 +1,7 @@
 /* =========================================================
    Dünya haritası (açılış ekranı)
    ========================================================= */
-#world { position: absolute; left: 0; top: 0; width: 960px; height: 640px; transform-origin: 0 0; display: none; z-index: 4; overflow: hidden; }
+#world { position: absolute; left: 0; top: 0; width: 960px; height: 640px; transform-origin: 0 0; display: none; z-index: 4; overflow: visible; }
 #stage.in-world #world { display: block; }
 #stage.in-world #ui { display: none; }
 #worldBg { position: absolute; left: 0; top: 0; width: 960px; height: 640px; }
@@ -84,47 +84,49 @@
 }
 #unlockMsg.show { opacity: 1; transform: translateX(-50%); }
 
-/* alt menü çubuğu */
-/* alt menü çubuğu: eşit boyutlu, aynı hizada madalyon düğmeler */
+/* alt menü çubuğu: pencerenin altına sabit, kompakt, eşit düğmeler */
 #worldBar {
-  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: stretch; padding: 5px 6px;
-  animation: barIn .6s cubic-bezier(.2,1.3,.4,1) both;
+  display: none; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 4;
+  align-items: stretch; padding: 4px 8px 7px; border-radius: 12px 12px 0 0; border-bottom: none;
+  animation: barIn .5s cubic-bezier(.2,1.3,.4,1) both;
 }
-@keyframes barIn { from { transform: translateX(-50%) translateY(90px); opacity: 0; } }
+#stage.in-world #worldBar { display: flex; }
+@keyframes barIn { from { transform: translateX(-50%) translateY(70px); opacity: 0; } }
 .wb {
-  position: relative; width: 100px; height: 72px; padding: 0; flex: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  position: relative; width: 84px; height: 50px; padding: 0; flex: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   border: none; border-radius: 8px; background: transparent; box-shadow: none;
-  color: var(--parch-1); font-family: Cinzel, serif; font-size: 12px; text-shadow: 0 1px 0 #000;
+  color: var(--parch-1); font-family: Cinzel, serif; font-size: 10px; letter-spacing: .3px; text-shadow: 0 1px 0 #000;
   transition: background .2s;
 }
 /* düğmeler arası ince altın ayraç */
 .wb + .wb::before {
-  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 1px;
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px;
   background: linear-gradient(180deg, transparent, rgba(201,162,74,.55), transparent);
 }
 .wb:hover:not(:disabled) { background: radial-gradient(ellipse at 50% 40%, rgba(255,220,150,.16), transparent 70%); filter: none; }
 .wb:active:not(:disabled) { transform: none; }
 .wb .wi {
-  width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; font-size: 19px;
+  width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; font-size: 14px;
   background: radial-gradient(circle at 35% 30%, #7a5230, var(--wood-2) 70%);
-  box-shadow: 0 0 0 2px var(--gold-2), 0 0 0 3px var(--wood-3), 0 3px 6px rgba(0,0,0,.6);
+  box-shadow: 0 0 0 2px var(--gold-2), 0 0 0 3px var(--wood-3), 0 2px 4px rgba(0,0,0,.6);
   transition: transform .2s cubic-bezier(.3,1.6,.5,1), box-shadow .2s;
 }
-.wb:hover .wi { transform: translateY(-3px) scale(1.1); box-shadow: 0 0 0 2px var(--gold-1), 0 0 0 3px var(--wood-3), 0 0 16px rgba(255,210,90,.7), 0 6px 10px rgba(0,0,0,.6); }
+.wb:hover .wi { transform: translateY(-2px) scale(1.1); box-shadow: 0 0 0 2px var(--gold-1), 0 0 0 3px var(--wood-3), 0 0 12px rgba(255,210,90,.7); }
 .wb:active .wi { transform: translateY(0) scale(.95); }
 .wb .wl { line-height: 1; white-space: nowrap; }
+.wb.play { width: 104px; }
 .wb.play .wi {
+  width: 34px; height: 34px; font-size: 17px;
   background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b852 45%, #8a5e1a);
   animation: playGlow 1.8s ease-in-out infinite;
 }
-.wb.play .wl { color: var(--gold-1); font-weight: 900; }
-@keyframes playGlow { 50% { box-shadow: 0 0 0 2px #fff0b8, 0 0 0 3px var(--wood-3), 0 0 20px 4px rgba(255,210,90,.8); } }
+.wb.play .wl { color: var(--gold-1); font-weight: 900; font-size: 11px; }
+@keyframes playGlow { 50% { box-shadow: 0 0 0 2px #fff0b8, 0 0 0 3px var(--wood-3), 0 0 16px 3px rgba(255,210,90,.8); } }
 .wb em {
-  position: absolute; top: 4px; right: 22px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
-  font-style: normal; font-family: Nunito, sans-serif; font-size: 11px; line-height: 18px; color: #3a2412; text-shadow: none;
-  background: var(--gold-1); box-shadow: 0 0 0 2px var(--wood-3), 0 0 10px rgba(255,210,90,.8);
+  position: absolute; top: 0; right: 10px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  font-style: normal; font-family: Nunito, sans-serif; font-size: 10px; line-height: 16px; color: #3a2412; text-shadow: none;
+  background: var(--gold-1); box-shadow: 0 0 0 2px var(--wood-3), 0 0 8px rgba(255,210,90,.8);
   animation: badge 1.4s ease-in-out infinite;
 }
 @keyframes badge { 50% { transform: scale(1.15); } }
@@ -249,3 +251,58 @@
 .achc small { color: #5a3c22; font-size: 11.5px; }
 .achc em { font-style: normal; font-size: 11px; font-weight: 800; color: #8a5a1a; white-space: nowrap; }
 .achc.done em { color: #2f6b1e; }
+
+
+/* bölüm kartı (yeniden tasarım): üç aşama yan yana, düşman kartları, ilerleme çubuğu */
+.lv { width: 560px; max-width: 94%; margin-top: 26px; padding: 26px 26px 20px; text-align: center; animation: rise .25s ease-out; }
+.lv-badge {
+  position: absolute; top: -22px; left: 50%; transform: translateX(-50%); min-width: 52px; height: 44px; padding: 0 10px;
+  display: grid; place-items: center; border-radius: 22px; font-family: Cinzel, serif; font-weight: 900; font-size: 17px; color: #3a2412;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2b852 45%, #8a5e1a);
+  box-shadow: inset 0 0 0 2px #8a5e1a, 0 0 0 3px var(--wood-3), 0 4px 8px rgba(0,0,0,.6);
+}
+.lv-x {
+  position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; padding: 0; border-radius: 50%; font-size: 14px; line-height: 1;
+  color: var(--parch-1); background: linear-gradient(180deg, var(--wood-1), var(--wood-2)); border: 2px solid var(--gold-3);
+}
+.lv-region { margin-top: 10px; font-family: Cinzel, serif; font-weight: 800; font-size: 12px; letter-spacing: 1px; color: #8a5a2a; }
+.lv-title { margin: 2px 0 0; font-family: Cinzel, serif; font-weight: 900; font-size: 28px; color: #4a1d0e; line-height: 1.1; }
+.lv-lore { margin: 6px 14px 12px; font-size: 13.5px; line-height: 1.45; color: #4a3018; font-style: italic; }
+.lv-progress { display: flex; align-items: center; gap: 10px; margin: 0 6px 12px; }
+.lv-bar { flex: 1; height: 10px; border-radius: 6px; overflow: hidden; background: rgba(90,58,32,.18); box-shadow: inset 0 1px 3px rgba(0,0,0,.25); }
+.lv-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #6fbf4a, #e2b852 60%, #d0503a); }
+.lv-progress span { font-family: Cinzel, serif; font-weight: 900; font-size: 14px; color: #6b4a2a; white-space: nowrap; }
+.lv-info { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lv-info span { padding: 4px 10px; border-radius: 12px; font-size: 12.5px; font-weight: 800; background: rgba(90,58,32,.15); box-shadow: inset 0 0 0 1px rgba(90,58,32,.3); }
+.lv-sec { display: flex; align-items: center; gap: 8px; margin: 14px 0 7px; font-family: Cinzel, serif; font-weight: 900; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a5a2a; }
+.lv-sec::before, .lv-sec::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #b08a4a, transparent); }
+.lv-foes { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.foe {
+  width: 86px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 10px;
+  background: rgba(90,58,32,.12); box-shadow: inset 0 0 0 1px rgba(90,58,32,.3);
+}
+.foe span {
+  width: 38px; height: 38px; display: grid; place-items: center; font-size: 21px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fbf0d0, #d9c08a); box-shadow: 0 0 0 2px #8a5e1a;
+}
+.foe small { font-size: 10.5px; font-weight: 800; line-height: 1.1; color: #4a3018; }
+.foe.unseen span { filter: grayscale(1) brightness(.8); }
+.foe.unseen small { color: #8a7050; }
+.lv-tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ltier {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px;
+  border-radius: 10px; background: linear-gradient(180deg, #fbf3d8, #ecd9ae);
+  box-shadow: inset 0 3px 0 var(--tc), 0 0 0 1px rgba(90,58,32,.35);
+}
+.ltier.perfect { box-shadow: inset 0 3px 0 var(--tc), 0 0 0 1px rgba(90,58,32,.35), 0 0 14px rgba(255,210,90,.6); }
+.ltier.locked { filter: grayscale(.7); opacity: .75; }
+.lt-name { font-family: Cinzel, serif; font-weight: 900; font-size: 15px; color: var(--tc); text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.lt-desc { min-height: 28px; font-size: 11px; line-height: 1.3; color: #5a3c22; }
+.lt-stars { font-size: 20px; letter-spacing: 2px; color: #c4b49a; }
+.lt-stars span.on { color: #d9a52a; text-shadow: 0 1px 0 #fff3c4; }
+.lt-lock { margin-top: 4px; font-size: 11px; font-weight: 800; line-height: 1.3; color: #7a5a3a; }
+.ltier .go {
+  width: 100%; margin-top: 4px; padding: 6px 10px; font-size: 13px; font-family: Cinzel, serif; color: var(--ink-dark);
+  background: linear-gradient(180deg, #fbe7a2, #e2b852 50%, #b4852c); border: 2px solid #fff0b8;
+  box-shadow: inset 0 0 0 2px #8a5e1a, 0 0 0 2px var(--wood-3), 0 3px 6px rgba(0,0,0,.45);
+}

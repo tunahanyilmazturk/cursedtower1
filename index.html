@@ -19,11 +19,12 @@
       <div id="res" class="plate">
         <div class="res gold" title="Altın"><i>💰</i><span id="gold">0</span></div>
         <div class="res gem" title="Mahzendeki kristaller"><i>💎</i><span id="crystals">0</span></div>
-        <div class="res wave" title="Dalga"><i>⚔️</i><span id="wave">0/0</span></div>
+        <div class="res wave" title="Dalga"><i>⚔️</i><span id="wave">0/0</span><div class="wprog"><i id="wprogFill"></i></div></div>
       </div>
       <button id="nextWave" class="sign">Dalgayı Başlat ▶</button>
       <div id="preview"></div>
       <div id="toast" class="hidden"></div>
+      <div id="enemyCard" class="hidden"></div>
       <div id="tut" class="hidden"></div>
       <div id="tutArrow" class="hidden">▼</div>
       <div id="ctrl">
@@ -51,6 +52,9 @@
         <span class="ws">⭐ <b id="wStars">0</b>/<span id="wStarsMax">0</span></span>
       </div>
       <div id="unlockMsg"></div>
+      <div id="levelCard"></div>
+    </div>
+    <!-- alt menü: pencerenin altına sabit -->
       <div id="worldBar" class="plate">
         <button class="wb" onclick="showPerks()"><span class="wi">🌳</span><span class="wl">Ruh Ağacı</span><em id="wFree"></em></button>
         <button class="wb" onclick="showBestiary()"><span class="wi">📜</span><span class="wl">Düşmanlar</span></button>
@@ -60,8 +64,7 @@
         <button class="wb" onclick="showHelp()"><span class="wi">❓</span><span class="wl">Nasıl Oynanır</span></button>
         <button class="wb" onclick="showSettings()"><span class="wi">⚙️</span><span class="wl">Ayarlar</span></button>
       </div>
-      <div id="levelCard"></div>
-    </div>
+    <div id="side"><div class="side-head">Kuleler</div><div id="sideCards"></div></div>
     <div id="overlay"></div>
   </div>
 </div>
